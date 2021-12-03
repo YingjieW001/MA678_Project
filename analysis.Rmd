@@ -1,0 +1,157 @@
+---
+title: "MA678 Project - Insurance Data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+insu <- read.csv("insurance.csv")
+dim(insu)
+head(insu)
+```
+```{r}
+library(ggplot2)
+
+ggplot(data = insu) +
+  aes(x=age) +
+  geom_histogram(binwidth = 3, fill = 'steelblue') + 
+  labs(title = "Distribution of Age")
+```
+
+```{r}
+ggplot(data = insu) +
+  aes(x = bmi) +
+  geom_histogram(fill = 'green4') + 
+  labs(title = "Distribution of BMI")
+```
+
+```{r}
+ggplot(data = insu) +
+  aes(x=children) +
+  geom_histogram(binwidth = 1, fill = 'coral3') + 
+  labs(title = "Distribution of Children")
+```
+
+```{r}
+ggplot(data = insu) +
+  aes(x=charges) +
+  geom_histogram(binwidth=1000, fill = 'gold') + 
+  labs(title = "Distribution of Charges")
+```
+
+```{r}
+ggplot(data = insu) +
+  aes(x=log(charges)) +
+  geom_histogram(binwidth=0.1, fill = 'gold') + 
+  labs(title = "Distribution of Log Charges")
+```
+
+
+```{r}
+library(dplyr) 
+
+insu %>%
+  count(sex, sort=TRUE) %>%
+  mutate(sex = reorder(sex, n)) %>%
+  ggplot(aes(n, sex)) + 
+  geom_col(fill='tan1')
+```
+
+```{r}
+insu %>%
+  count(region, sort=TRUE) %>%
+  mutate(region = reorder(region, n)) %>%
+  ggplot(aes(n, region)) + 
+  geom_col(fill='darkolivegreen3')
+```
+
+```{r}
+insu %>%
+  count(smoker, sort=TRUE) %>%
+  mutate(smoker = reorder(smoker, n)) %>%
+  ggplot(aes(n, smoker)) + 
+  geom_col(fill='rosybrown1')
+```
+
+```{r}
+ggplot(data = insu) +
+  aes(age, charges) +
+  geom_point(aes(color = factor(smoker)), alpha = 0.3) +
+  labs(title = "Charges vs Age") +
+  geom_smooth(formula = y~x, aes(color = factor(smoker)), method = 'lm')
+```
+```{r}
+ggplot(data = insu) +
+  aes(age, charges) +
+  geom_point(aes(color = factor(sex)), alpha = 0.3) +
+  labs(title = "Charges vs Age") +
+  geom_smooth(aes(color = factor(sex)), method = 'lm')
+```
+```{r}
+fit_1 <- lm(log(charges) ~ age + bmi + sex + smoker, data=insu)
+summary(fit_1)
+```
+
+```{r}
+plot(fitted(fit_1), resid(fit_1))
+head(fitted(fit_1))
+```
+
+```{r}
+qqnorm(resid(fit_1))
+qqline(resid(fit_1))
+```
+
+```{r}
+fit_2 <- lm(log(charges) ~ age + bmi + I(bmi^2) + sex + smoker, data=insu)
+summary(fit_2)
+```
+
+```{r}
+plot(fitted(fit_2), resid(fit_2))
+qqnorm(resid(fit_2))
+qqline(resid(fit_2))
+```
+
+```{r}
+fit_3 <- lm(charges ~ age + bmi + I(bmi^2) + sex + smoker, data=insu)
+summary(fit_3)
+```
+
+```{r}
+plot(fitted(fit_3), resid(fit_3))
+qqnorm(resid(fit_3))
+qqline(resid(fit_3))
+```
+```{r}
+fit_4 <- lm(charges ~ age + bmi + sex + smoker + region, data=insu)
+summary(fit_4)
+```
+
+```{r}
+plot(fitted(fit_4), resid(fit_4))
+qqnorm(resid(fit_4))
+qqline(resid(fit_4))
+```
+```{r}
+fit_5 <- glm(charges ~ age + bmi + I(bmi^2) + sex + sex*smoker + smoker + children, data=insu)
+summary(fit_5)
+```
+
+```{r}
+plot(fitted(fit_5), resid(fit_5))
+qqnorm(resid(fit_5))
+qqline(resid(fit_5))
+```
+```{r}
+model <- glm(charges ~ age + bmi + I(bmi^2) + sex*smoker + children, data=insu)
+summary(model)
+
+plot(fitted(model), resid(model))
+qqnorm(resid(model))
+qqline(resid(model))
+```
+
