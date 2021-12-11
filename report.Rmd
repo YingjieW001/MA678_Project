@@ -7,14 +7,16 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 options(warn=-1)
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'H')
+
+library("lme4")
 insu <- read.csv("insurance.csv")
-model <- glm(charges ~ age + bmi + I(bmi^2) + sex*smoker + children, data=insu)
+model <- lmer(log(charges) ~ age + sex + bmi + children + (1 + age|smoker), data=insu)
 ```
 
 ## Abstract
 
-Health insurace is an important part of daily life, and its charges depend on a lot of factors. In this project, a health insurance datast is analyzed with the goal of determining what factors affect the amount of health insurance charges. To address this problem, a generalized linear regression model is implemented to reveal related factors.
+Health insurace is an important part of daily life, and its charges depend on a lot of factors. In this project, a health insurance dataset is analyzed with the goal of determining what factors affect the amount of health insurance charges. Considering non-smoker group and smoker group can influence the way predictors affect the outcome, a multilevel model is implemented to reveal related factors. The model shows that there is clear difference between the way predictors affect the outcome for non-smoker group and smoker group, both for intercept and the slope of age variable.
 
 ## Introduction
 
@@ -41,9 +43,109 @@ For preparing the dataset, I loaded the dataset "insurance.csv" in RStudio. The 
 
 ### Exploratory Data Analysis
 
-First, I explored the distribution of attributed. For numerical attributed, histograms are created:
+First, I explored the distribution of numerical attributes and the overall histograms are shown in appendix. Among all numerical attributes' distributions, charges' distribution is far from normal distribution, so I took the log of this attribute where the transformed distribution is more like a normal distribution. The two distributions (before and after log transformation) are shown in Figure 1. For all the downstream analysis, log transformation is used for the charges attribute.
 
-```{r echo=FALSE, fig.height=8, fig.width=8, fig.cap="Histograms of numerical attributes."}
+```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Histograms of numerical attributes."}
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lattice)
+
+hist_charge <- ggplot(data = insu) +
+  aes(x=charges) +
+  geom_histogram(binwidth=1000, fill = 'gold2') + 
+  labs(title = "Distribution of Charges")
+
+hist_log_charge <- ggplot(data = insu) +
+  aes(x=log(charges)) +
+  geom_histogram(binwidth=0.1, fill = 'gold2') + 
+  labs(title = "Distribution of log(Charges)")
+
+grid.arrange(hist_charge, hist_log_charge, nrow=1)
+```
+
+Considering age is very likely to be related to health insurance charges, scatter plots of the relationship between attribute "age" and "log(charges)" are plotted. There are some factors that may influence the relationship between "age" and "log(charges)". Among all other attributes, "smoker" amd "sex" are selected.
+
+```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Scatter plot showing the relationship between age and log(charges), grouped by whether the insurance contractor is a smoker."}
+ggplot(data = insu) +
+  aes(age, log(charges)) +
+  geom_point(aes(color = factor(smoker)), alpha = 0.3) +
+  labs(title = "log(Charges) vs Age") +
+  geom_smooth(formula = y~x, aes(color = factor(smoker)), method = 'lm')
+```
+
+```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Scatter plot showing the relationship between age and log(charges), grouped by the gender of the insurance contractor."}
+ggplot(data = insu) +
+  aes(age, log(charges)) +
+  geom_point(aes(color = factor(sex)), alpha = 0.3) +
+  labs(title = "log(Charges) vs Sex") +
+  geom_smooth(formula = y~x, aes(color = factor(sex)), method = 'lm')
+```
+
+From these two scatter plots, relationship between the age and log(charges) are highly influenced by whether the insurance contractor is a smoker. However, there is no obvious difference when grouping by sex attribute, with male contractor pays slightly more than female contractor on average.
+
+### Model Fitting
+
+A multilevel model is used to fit the data considering different categories. Given the distribution of "charges" attribute, a log transformation is used. Therefore, log(charges) is the outcome of the model. Since from EDA it is noted that the smoker categories (whether an insurance contractor is a smoker) have different correlation with variables, I used varying slope and varying intercept in this multilevel models.
+
+Below is the function:
+
+```{r eval=FALSE}
+model <- lmer(log(charges) ~ age + sex + bmi + children + (1 + age|smoker), data=insu)
+```
+
+## Result
+
+### Model Coefficients
+
+The fixed effects of our fitted model is shown below:
+
+|                |Estimate   |Std. Error  |df        |t value |Pr(>&#124;t&#124;) |
+|:---:           |:---:      |:---:       |:---:     |:---:   |:---:              |
+|(Intercept)     |8.165      |7.622e-01   |4.544     |10.712  |0.000214 ***       |
+|age             |2.529e-02  |8.691e-03   |4.458     |2.91    |0.038306 *         |
+|sexmale         |-7.228e-02 |2.255e-02   |1331      |-3.205  |0.001384 **        |
+|bmi             |1.02e-02   |1.856e-03   |1331      |5.496   |4.65e-08 ***       |
+|children        |1.044e-01  |9.330e-03   |1331      |11.189  | < 2e-16 ***       |
+
+From the fixed effect table, the attribute age is not significant at alpha = 0.05 level. This might be caused by the difference of age attribute's influences on the outcome.
+
+For different categories, each predictor always has different influence on the outcome. Below is random effects table for different categories:
+
+|                 |(Intercept) |age       |sexmale  |bmi         |children    |
+|:---:            |:---:       |:---:     |:---:    |:---:       |:---:       |
+|Non-smoker       |6.7794      |0.0411    |-0.0723  |0.0102      |0.1044      |
+|Smoker           |9.5497      |0.0095    |-0.0723  |0.0102      |0.1044      |
+
+Therefore, for non-smoker, we can conclude the formula as follow:
+
+$$
+\begin{aligned}
+log(charges) = &6.7794 + 0.0411\cdot age - 0.0723\cdot I_{male} + 0.0102\cdot bmi + 0.1044 \cdot children
+\end{aligned}
+$$
+
+For smoker, we have another formula:
+
+$$
+\begin{aligned}
+log(charges) = &9.5497 + 0.0095\cdot age - 0.0723\cdot I_{male} + 0.0102\cdot bmi + 0.1044 \cdot children
+\end{aligned}
+$$
+
+### Model Validation
+
+A residual plot is shown in Appendix Figure 4. From the residual plot, there are some outliers. The possible reason is that there exist some factors that influence the health insurance that are not included in the dataset. For example, some insurance contractors may have some disease history that increase the health insurance charges, however, it is not shown in the dataset. This can well explain the outliers on the upper half of the residual plot.
+
+## Discussion
+
+In this project, predictors' relationship with the outcome log(charges) is analyzed. Due to helpful EDA, it is noted that the distribution of attribute "charges" is far from normal distribution which leads to a log-transformation. It is also important to note that attribute "age" have different influence to the outcome for different smoker categories (non-smoker and smoker). Considering these two facts, a multilevel model with outcome "log(charges)" is implemented. The result of this model highly agree with out assumption that the "smoker" category can affect the way attribute "age" influence the outcome.
+
+## Appendix
+
+### EDA histograms
+
+```{r echo=FALSE, fig.height=8, fig.width=8, fig.cap="Histograms of numerical attributes.", fig.pos="H"}
 library(gridExtra)
 library(grid)
 library(ggplot2)
@@ -72,53 +174,8 @@ f4 <- ggplot(data = insu) +
 grid.arrange(f1,f2, f3, f4,nrow=2)
 ```
 
-Considering age is very likely to be related to health insurance charges, scatter plots of the relationship between attribute "age" and "charges" are plotted. There are some factors that may influence the relationship between "age" and "charges". Among all other attributes, "smoker" amd "sex" are selected.
+### Residual plot
 
-```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Scatter plot showing the relationship between age and charges, grouped by whether the insurance contractor is a smoker."}
-ggplot(data = insu) +
-  aes(age, charges) +
-  geom_point(aes(color = factor(smoker)), alpha = 0.3) +
-  labs(title = "Charges vs Age") +
-  geom_smooth(formula = y~x, aes(color = factor(smoker)), method = 'lm')
+```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Residual plot.", fig.pos="H"}
+plot(model)
 ```
-
-```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Scatter plot showing the relationship between age and charges, grouped by the gender of the insurance contractor."}
-ggplot(data = insu) +
-  aes(age, charges) +
-  geom_point(aes(color = factor(sex)), alpha = 0.3) +
-  labs(title = "Charges vs Sex") +
-  geom_smooth(formula = y~x, aes(color = factor(sex)), method = 'lm')
-```
-
-From these two scatter plots, relationship between the age and charges are highly influenced by whether the insurance contractor is a smoker, with a smoker contractor paying 24000 more than a non-smoker on average for health insurance. However, there is no obvious difference when grouping by sex attribute, with male contractor pays slightly more than female contractor on average.
-
-### Model Fitting
-
-A generalized linear model is implemented to capture the relationship between the health insurance charges and predictors. The attribute "region" is not included in the predictors, since intuitively, the health insurance is not likely to be influenced by general region. Considering whether a contractor is a smoker is likely to be related to the gender of the contractor, the interaction between attribute "smoker" and attribute "sex" is included. BMI is a measure related to health, and very-low or very-high BMI are both likely to reduce the health level of the contractor, therefore a quadratic term of BMI is also included in the regression model.
-
-Below is the function:
-
-```{r eval=FALSE}
-model <- glm(charges ~ age + bmi + I(bmi^2) + sex * smoker + children, data=insu)
-```
-
-## Result
-
-### Model Coefficients
-
-The formula of our fitted model is shown below:
-
-$$
-\begin{aligned}
-charges = &-18177.710 +256.317\cdot age + 748.177\cdot bmi -6.809\cdot bmi^2 -568.723\cdot I_{male} + 22609.172\cdot I_{smoker} + \\
-&464.322\cdot children + 2200.165\cdot I_{male}\cdot I_{smoker}
-\end{aligned}
-$$
-
-### Model Validation
-
-```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Residual plot."}
-plot(fitted(model), resid(model))
-```
-
-From the residual plot, there are some outliers. The possible reason is that there exist some factors that influence the health insurance that are not included in the dataset. For example, some insurance contractors may have some disease history that increase the health insurance charges, however, it is not shown in the dataset. This can well explain the outliers on the upper half of the residual plot.

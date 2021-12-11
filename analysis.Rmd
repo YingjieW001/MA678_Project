@@ -5,6 +5,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library("lme4")
 ```
 
 ```{r}
@@ -12,6 +13,7 @@ insu <- read.csv("insurance.csv")
 dim(insu)
 head(insu)
 ```
+
 ```{r}
 library(ggplot2)
 
@@ -83,6 +85,7 @@ ggplot(data = insu) +
   labs(title = "Charges vs Age") +
   geom_smooth(formula = y~x, aes(color = factor(smoker)), method = 'lm')
 ```
+
 ```{r}
 ggplot(data = insu) +
   aes(age, charges) +
@@ -90,6 +93,7 @@ ggplot(data = insu) +
   labs(title = "Charges vs Age") +
   geom_smooth(aes(color = factor(sex)), method = 'lm')
 ```
+
 ```{r}
 fit_1 <- lm(log(charges) ~ age + bmi + sex + smoker, data=insu)
 summary(fit_1)
@@ -126,6 +130,7 @@ plot(fitted(fit_3), resid(fit_3))
 qqnorm(resid(fit_3))
 qqline(resid(fit_3))
 ```
+
 ```{r}
 fit_4 <- lm(charges ~ age + bmi + sex + smoker + region, data=insu)
 summary(fit_4)
@@ -136,6 +141,7 @@ plot(fitted(fit_4), resid(fit_4))
 qqnorm(resid(fit_4))
 qqline(resid(fit_4))
 ```
+
 ```{r}
 fit_5 <- glm(charges ~ age + bmi + I(bmi^2) + sex + sex*smoker + smoker + children, data=insu)
 summary(fit_5)
@@ -146,6 +152,7 @@ plot(fitted(fit_5), resid(fit_5))
 qqnorm(resid(fit_5))
 qqline(resid(fit_5))
 ```
+
 ```{r}
 model <- glm(charges ~ age + bmi + I(bmi^2) + sex*smoker + children, data=insu)
 summary(model)
@@ -153,5 +160,13 @@ summary(model)
 plot(fitted(model), resid(model))
 qqnorm(resid(model))
 qqline(resid(model))
+```
+```{r}
+library(lmerTest)
+lmer1 <- lmer(log(charges) ~ age + sex + bmi + children + (1 + age|smoker), data=insu)
+summary(lmer1)
+coef(lmer1)
+plot(lmer1,which=2)
+anova(lmer1)
 ```
 
